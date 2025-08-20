@@ -1,4 +1,4 @@
-name: Deploy to repository
+name: Code Quality
 
 on:
   push:
@@ -9,18 +9,33 @@ jobs:
   analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
 
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('app/composer.lock') }}
+          restore-keys: composer-
+
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
+      - name: Ensure tools present
+        working-directory: app
+        run: |
+          composer require --no-interaction --dev phpstan/phpstan squizlabs/php_codesniffer
+
       - name: Run PHPStan
+        working-directory: app
         run: vendor/bin/phpstan analyse src/ --level=max
 
       - name: Run PHPCS
+        working-directory: app
         run: vendor/bin/phpcs src/
