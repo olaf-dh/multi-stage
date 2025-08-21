@@ -4,7 +4,7 @@ IMAGE   ?= $(PROJECT):prod
 APP_DIR ?= app
 CMD ?=
 
-.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs
+.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project
 
 help:
 	@echo "Targets:"
@@ -27,6 +27,7 @@ help:
 	@echo "  console            - execute bin/console commands in container (like: make console CMD=\"make:controller HomeController\")"
 	@echo "  phpstan            - execute static analysis PHPStan"
 	@echo "  phpcs              - execute static analysis PHP CodeSniffer"
+	@echo "  start-project      - use this command after clone to start the project"
 
 # This is only necessary when app-directory not exists
 first-init: setup build up wait-db ensure-env-local install-doctrine db-create migrate init-frontend node-build
@@ -112,3 +113,7 @@ phpstan:
 
 phpcs:
 	docker compose exec php vendor/bin/phpcs
+
+start-project:
+	@$(MAKE) up
+	@$(MAKE) console CMD='install'
