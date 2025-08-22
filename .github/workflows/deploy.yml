@@ -72,7 +72,7 @@ jobs:
       - name: Rsync code to server (to release/)
         run: |
           rsync -az --delete \
-          --exclude-from=deploy.rsyncignore \
+          --exclude-from=.rsyncignore \
           -e "ssh -p ${{ secrets.SSH_PORT }}" \
           ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/release/
 
