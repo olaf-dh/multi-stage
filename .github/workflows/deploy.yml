@@ -88,15 +88,16 @@ jobs:
             set -euo pipefail; \
             mkdir -p ${REMOTE}/shared; \
             tmp=\$(mktemp ${REMOTE}/shared/.env.local.XXXXXX); \
-            {
-              echo 'APP_ENV=prod';
-              echo 'APP_SECRET=${{ secrets.APP_SECRET }}';
-              echo 'DATABASE_URL=mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverVersion=mariadb-10.6&charset=utf8mb4';
-            } > \"\${tmp}\"; \
+            printf '%s\n' \
+              'APP_ENV=prod' \
+              'APP_SECRET=${{ secrets.APP_SECRET }}' \
+              'DATABASE_URL=mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverVersion=mariadb-10.6&charset=utf8mb4' \
+              > \"\${tmp}\"; \
             chmod 600 \"\${tmp}\"; \
-            mv \"\${tmp}\" ${REMOTE}/shared/.env.local \
+            mv \"\${tmp}\" ${REMOTE}/shared/.env.local
           "
-        env: { REMOTE: ${{ secrets.REMOTE_PATH }} }
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
 
       - name: Link shared files & folders
         run: |
