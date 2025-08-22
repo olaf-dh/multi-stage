@@ -69,6 +69,12 @@ jobs:
         run: |
           ssh-keyscan -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Sanity check (rsyncignore present)
+        run: |
+          test -f .rsyncignore || (echo "Missing .rsyncignore at repo root" && exit 1)
+          echo "Found .rsyncignore:"
+          sed -n '1,80p' .rsyncignore
+
       - name: Rsync code to server (to release/)
         run: |
           rsync -az --delete \
