@@ -94,6 +94,15 @@ jobs:
         env:
           REMOTE: ${{ secrets.REMOTE_PATH }}
 
+      - name: Ensure empty .env exists (needed for dump-env)
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            cd ${REMOTE}/release && \
+            [ -f .env ] || printf '' > .env \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
+
       - name: Compile env to .env.local.php (prod)
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
