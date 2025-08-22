@@ -82,13 +82,30 @@ jobs:
           -e "ssh -p ${{ secrets.SSH_PORT }}" \
           ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/release/
 
+      - name: Write shared/.env.local from GitHub Secrets (atomic)
+        run: |
+          ssh -p "${{ secrets.SSH_PORT }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            set -euo pipefail; \
+            mkdir -p ${REMOTE}/shared; \
+            tmp=\$(mktemp ${REMOTE}/shared/.env.local.XXXXXX); \
+            {
+              echo 'APP_ENV=prod';
+              echo 'APP_SECRET=${{ secrets.APP_SECRET }}';
+              echo 'DATABASE_URL=mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverVersion=mariadb-10.6&charset=utf8mb4';
+              # optional: echo 'MAILER_DSN=${{ secrets.MAILER_DSN }}';
+            } > \"\${tmp}\"; \
+            chmod 600 \"\${tmp}\"; \
+            mv \"\${tmp}\" ${REMOTE}/shared/.env.local \
+          "
+        env: { REMOTE: ${{ secrets.REMOTE_PATH }} }
+
       - name: Link shared files & folders
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
             ln -sfn ${REMOTE}/shared/.env.local ${REMOTE}/release/.env.local && \
-            mkdir -p ${REMOTE}/release/var && \
+            mkdir -p ${REMOTE}/shared/var ${REMOTE}/shared/public/uploads && \
+            mkdir -p ${REMOTE}/release/var ${REMOTE}/release/public/uploads && \
             ln -sfn ${REMOTE}/shared/var ${REMOTE}/release/var && \
-            mkdir -p ${REMOTE}/release/public/uploads && \
             ln -sfn ${REMOTE}/shared/public/uploads ${REMOTE}/release/public/uploads \
           "
         env:
