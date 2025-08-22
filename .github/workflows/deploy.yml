@@ -82,22 +82,21 @@ jobs:
           -e "ssh -p ${{ secrets.SSH_PORT }}" \
           ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/release/
 
-      - name: Write shared/.env.local from GitHub Secrets (atomic)
+      - name: Write shared/.env.local from GitHub Secrets (heredoc)
         run: |
-          ssh -p "${{ secrets.SSH_PORT }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
-            set -euo pipefail; \
-            mkdir -p ${REMOTE}/shared; \
-            tmp=\$(mktemp ${REMOTE}/shared/.env.local.XXXXXX); \
-            printf '%s\n' \
-              'APP_ENV=prod' \
-              'APP_SECRET=${{ secrets.APP_SECRET }}' \
-              'DATABASE_URL=mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverVersion=mariadb-10.6&charset=utf8mb4' \
-              > \"\${tmp}\"; \
-            chmod 600 \"\${tmp}\"; \
-            mv \"\${tmp}\" ${REMOTE}/shared/.env.local
-          "
-        env:
-          REMOTE: ${{ secrets.REMOTE_PATH }}
+          ssh -p "${{ secrets.SSH_PORT }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -s' <<'BASH'
+          set -euo pipefail
+          REMOTE="${{ secrets.REMOTE_PATH }}"
+          mkdir -p "$REMOTE/shared"
+          tmp="$(mktemp "$REMOTE/shared/.env.local.XXXXXX")"
+          cat > "$tmp" <<'EOF'
+          APP_ENV=prod
+          APP_SECRET=${{ secrets.APP_SECRET }}
+          DATABASE_URL=mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverVersion=mariadb-10.6&charset=utf8mb4
+          EOF
+          chmod 600 "$tmp"
+          mv "$tmp" "$REMOTE/shared/.env.local"
+          BASH
 
       - name: Link shared files & folders
         run: |
