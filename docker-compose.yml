@@ -21,13 +21,13 @@ services:
       - php
 
   db:
-    image: postgres:16-alpine
+    image: mariadb:10.6.21
     environment:
       POSTGRES_DB: app
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
     volumes:
-      - dbdata:/var/lib/postgresql/data
+      - dbdata:/var/lib/mysql
 
 volumes:
   dbdata:

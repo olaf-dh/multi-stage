@@ -4,7 +4,7 @@ IMAGE   ?= $(PROJECT):prod
 APP_DIR ?= app
 CMD ?=
 
-.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project
+.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project install-twig init-demo
 
 help:
 	@echo "Targets:"
@@ -28,9 +28,11 @@ help:
 	@echo "  phpstan            - execute static analysis PHPStan"
 	@echo "  phpcs              - execute static analysis PHP CodeSniffer"
 	@echo "  start-project      - use this command after clone to start the project"
+	@echo "  install-twig       - use this command to install Twig-Templating"
+	@echo "  init-demo          - install a first controller and a twig-template"
 
 # This is only necessary when app-directory not exists
-first-init: setup build up wait-db ensure-env-local install-doctrine db-create migrate init-frontend node-build
+first-init: setup build up wait-db ensure-env-local install-doctrine db-create migrate install-twig init-demo init-frontend node-build
 	@echo "🚀 Project was initialized fully!"
 
 install-doctrine:
@@ -70,6 +72,12 @@ setup:
 	@test -d $(APP_DIR) || docker run --rm -u $(shell id -u):$(shell id -g) \
     	-v $(PWD):/work -w /work \
     	composer:2 create-project symfony/skeleton $(APP_DIR)
+
+install-twig:
+	docker compose run --rm composer require symfony/twig-bundle
+
+init-demo:
+	@APP_DIR=$(APP_DIR) bash scripts/init-demo.sh
 
 build:
 	docker compose build

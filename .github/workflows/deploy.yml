@@ -1,4 +1,4 @@
-name: Code Quality
+name: Code Quality, Deployment
 
 on:
   push:
@@ -51,3 +51,71 @@ jobs:
           else
             echo "::warning ::phpcs is missing (require-dev) – step skipped"
           fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: '1'
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Known hosts
+        run: |
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync code to server (to release/)
+        run: |
+          rsync -az --delete \
+          --exclude-from=deploy.rsyncignore \
+          -e "ssh -p ${{ secrets.SSH_PORT }}" \
+          ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/release/
+
+      - name: Link shared files & folders
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            ln -sfn ${REMOTE}/shared/.env.local ${REMOTE}/release/.env.local && \
+            mkdir -p ${REMOTE}/release/var && \
+            ln -sfn ${REMOTE}/shared/var ${REMOTE}/release/var && \
+            mkdir -p ${REMOTE}/release/public/uploads && \
+            ln -sfn ${REMOTE}/shared/public/uploads ${REMOTE}/release/public/uploads \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
+
+      - name: Install composer deps (prod, no-dev)
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            cd ${REMOTE}/release && \
+            ${PHP_BIN:-php} -v &&\
+            ${COMPOSER_BIN:-composer} install --no-dev --prefer-dist --no-interaction --optimize-autoloader \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
+          PHP_BIN: ${{ secrets.PHP_BIN }}
+          COMPOSER_BIN: ${{ secrets.COMPOSER_BIN }}
+
+      - name: Symfony cache warmup & perms
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            cd ${REMOTE}/release && \
+            APP_ENV=prod ${PHP_BIN:-php} bin/console cache:clear --no-warmup && \
+            APP_ENV=prod ${PHP_BIN:-php} bin/console cache:warmup && \
+            chmod -R u+rwX,g+rwX var \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
+          PHP_BIN: ${{ secrets.PHP_BIN }}
+
+      - name: Switch current -> release (atomic)
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            ln -sfn ${REMOTE}/release ${REMOTE}/current \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}

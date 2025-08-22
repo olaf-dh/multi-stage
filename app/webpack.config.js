@@ -39,7 +39,7 @@ Encore
     .cleanupOutputBeforeBuild()
 
     // Displays build status system notifications to the user
-    // .enableBuildNotifications()
+    .enableBuildNotifications()
 
     .enableSourceMaps(!Encore.isProduction())
     // enables hashed filenames (e.g. app.abc123.css)
@@ -56,8 +56,9 @@ Encore
         config.corejs = '3.38';
     })
 
+    .enablePostCssLoader()
     // enables Sass/SCSS support
-    //.enableSassLoader()
+    .enableSassLoader()
 
     // uncomment if you use TypeScript
     //.enableTypeScriptLoader()
