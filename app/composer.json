@@ -9,6 +9,7 @@
         "ext-iconv": "*",
         "doctrine/dbal": "^3",
         "doctrine/doctrine-bundle": "^2.15",
+        "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.5",
         "symfony/asset": "7.3.*",
         "symfony/console": "7.3.*",
@@ -72,7 +73,6 @@
         }
     },
     "require-dev": {
-        "doctrine/doctrine-migrations-bundle": "^3.4",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-doctrine": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
