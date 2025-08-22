@@ -94,6 +94,17 @@ jobs:
         env:
           REMOTE: ${{ secrets.REMOTE_PATH }}
 
+      - name: Compile env to .env.local.php (prod)
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            cd ${REMOTE}/release && \
+            ${COMPOSER_BIN:-composer} dump-env prod \
+          "
+        env:
+          REMOTE: ${{ secrets.REMOTE_PATH }}
+          COMPOSER_BIN: ${{ secrets.COMPOSER_BIN }}
+
+
       - name: Install composer deps (prod, no-dev)
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
