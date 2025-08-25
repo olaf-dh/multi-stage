@@ -154,6 +154,14 @@ jobs:
           REMOTE: ${{ secrets.REMOTE_PATH }}
           PHP_BIN: ${{ secrets.PHP_BIN }}
 
+      - name: Smoke test with retry
+        run: |
+          for i in 1 2; do
+            if curl -fsS --max-time 10 "https://demo.oh-it.dev/health"; then exit 0; fi
+            echo "Retrying in 5s..."; sleep 5
+          done
+          echo "Smoke test failed"; exit 1
+
       - name: Switch current -> release (atomic)
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\

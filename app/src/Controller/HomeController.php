@@ -2,7 +2,10 @@
 
 namespace App\Controller;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -17,8 +20,15 @@ class HomeController extends AbstractController
     }
 
     #[Route('/health', name: 'health')]
-    public function health(): Response
+    public function health(Connection $conn): JsonResponse
     {
-        return new Response('OK', 200);
+        try {
+            $conn->executeQuery('SELECT 1')->fetchOne();
+            $db = 'up';
+        } catch (\Throwable $e) {
+            $db = 'down';
+        }
+
+        return $this->json(['app' => 'up', 'db' => $db]);
     }
 }

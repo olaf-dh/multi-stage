@@ -4,7 +4,7 @@ IMAGE   ?= $(PROJECT):prod
 APP_DIR ?= app
 CMD ?=
 
-.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project install-twig init-demo
+.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project install-twig init-demo health
 
 help:
 	@echo "Targets:"
@@ -30,6 +30,7 @@ help:
 	@echo "  start-project      - use this command after clone to start the project"
 	@echo "  install-twig       - use this command to install Twig-Templating"
 	@echo "  init-demo          - install a first controller and a twig-template"
+	@echo "  health             - check status for services nginx, php and db"
 
 # This is only necessary when app-directory not exists
 first-init: setup build up wait-db ensure-env-local install-doctrine db-create migrate install-twig init-demo init-frontend node-build
@@ -125,3 +126,8 @@ phpcs:
 start-project:
 	@$(MAKE) up
 	@$(MAKE) console CMD='install'
+
+health:
+	@echo "nginx:" && docker compose exec -T nginx sh -lc 'wget -q --spider http://127.0.0.1/health && echo "  OK" || (echo "  DOWN"; exit 1)'
+	@echo "php-fpm:" && docker compose exec -T php sh -lc 'php -r '\''exit(@fsockopen("127.0.0.1",9000) ? 0 : 1);'\'' && echo "  OK" || (echo "  DOWN"; exit 1)'
+	@echo "db:" && docker compose exec -T db sh -lc 'mysqladmin ping -h localhost -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent && echo "  OK" || (echo "  DOWN"; exit 1)'

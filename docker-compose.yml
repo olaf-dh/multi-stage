@@ -8,6 +8,12 @@ services:
     image: my-symfony-app:prod
     depends_on:
       - db
+    healthcheck:
+      test: ["CMD", "php -r 'if(@fsockopen(\"127.0.0.1\",9000,$$errno,$$errstr,1)){exit(0);}exit(1);'"]
+      interval: 15s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
 
   nginx:
     build:
@@ -19,15 +25,28 @@ services:
       - "8080:80"
     depends_on:
       - php
+    healthcheck:
+      test: ["CMD", "wget", "-q0-", "http://127.0.0.1/fpm-ping >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   db:
     image: mariadb:10.6.21
     environment:
-      POSTGRES_DB: app
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
+      MARIADB_DATABASE: app
+      MARIADB_USER: app
+      MARIADB_PASSWORD: app
+      MARIADB_ROOT_PASSWORD: root
     volumes:
       - dbdata:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
 volumes:
   dbdata:
