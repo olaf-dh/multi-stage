@@ -156,11 +156,18 @@ jobs:
 
       - name: Smoke test with retry
         run: |
-          for i in 1 2; do
-            if curl -fsS --max-time 10 "https://demo.oh-it.dev/health"; then exit 0; fi
-            echo "Retrying in 5s..."; sleep 5
+          URL="https://demo.oh-it.dev/health"
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i: $URL"
+            status=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL")
+            echo "HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "Smoke OK"; exit 0
+            fi
+            sleep 6
           done
           echo "Smoke test failed"; exit 1
+      
 
       - name: Switch current -> release (atomic)
         run: |
