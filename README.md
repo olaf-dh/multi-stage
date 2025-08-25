@@ -187,6 +187,7 @@ make assets-build
    - install prod dependencies (`--no-dev`)
    - warmup symfony cache
 3. Subdomain points to `${REMOTE_PATH}/release/public`
+4. **Important:** When the webhoster uses Apache, it requires the Symfony `.htaccess` file in `public/` to rewrite requests to `index.php`.
 
 👉 Just open https://your-subdomain.example.com in your browser
 
@@ -199,6 +200,13 @@ make assets-build
 ---
 
 ## Troubleshooting
+
+### 404 errors on routes (/health)
+
+Ensure that `public/.htaccess` exists and was deployed.  
+It contains the Apache rewrite rules to forward all requests to `index.php`.  
+Without it, Symfony routes will return 404.
+
 
 ### Composer CA certificates (curl error 60)
 
