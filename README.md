@@ -70,10 +70,10 @@ make assets-build
 ## Service overview
 
 | Service  | Defined in      | Role                        | Image / Build                                                              | Ports (host→container) | Volumes (host → container)                                                                        | Env / Command                                                   | Depends on |
-| -------- | --------------- | --------------------------- | -------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
+| -------- |-----------------|-----------------------------|----------------------------------------------------------------------------| ---------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
 | php      | base + override | PHP-FPM runtime for Symfony | Build: `Dockerfile` → `my-symfony-app:prod`                                | –                      | `./app` → `/var/www/html:delegated` (override)                                                    | `APP_ENV=dev`, `APP_DEBUG=1`                                    | db         |
 | nginx    | base + override | HTTP server & static files  | Build: `docker/nginx/Dockerfile` (arg `RUNTIME_IMAGE=my-symfony-app:prod`) | `8080` → `80`          | `./app` → `/var/www/html:ro`, `./docker/nginx/default.conf` → `/etc/nginx/conf.d/default.conf:ro` | –                                                               | php        |
-| db       | base            | PostgreSQL 16               | Image: `postgres:16-alpine`                                                | – (internal only)      | `dbdata` (named volume) → `/var/lib/postgresql/data`                                              | `POSTGRES_DB=app`, `POSTGRES_USER=app`, `POSTGRES_PASSWORD=app` | –          |
+| db       | base + override | MariaDB 10.6                | Image: `mariadb:10.6.21`                                                   | – (internal only)      | `dbdata` (named volume) → `/var/lib/postgresql/data`                                              | `POSTGRES_DB=app`, `POSTGRES_USER=app`, `POSTGRES_PASSWORD=app` | –          |
 | composer | override        | Composer CLI (ephemeral)    | Build: `docker/composer/Dockerfile`                                        | –                      | `./app` → `/app`, `${HOME}/.cache/composer` → `/tmp/composer/cache`                               | `COMPOSER_HOME=/tmp/composer`, entrypoint `composer`            | –          |
 | node     | override        | Assets build + dev watcher  | Image: `node:20-alpine`                                                    | –                      | `./app` → `/app`                                                                                  | `command: npm install && npm run dev -- --watch`                | –          |
 
@@ -81,12 +81,12 @@ make assets-build
 
 - `docker compose` merges `docker-compose.yml` and `docker-compose.override.yml` automatically for local dev.
 - Use `make up-prod` for CI/minimal runs that ignore the override (no dev watcher/Composer service).
-- If you need to access Postgres from the host, you can add a port mapping in the override, e.g.:
+- If you need to access MariaDB from the host, you can add a port mapping in the override, e.g.:
   ```yaml
   services:
     db:
       ports:
-        - "5432:5432"
+        - "53306:3306"
   ```
 
 ## Typical developer workflow
@@ -153,9 +153,48 @@ make assets-build
 
 ## Environment configuration
 
-- Symfony reads environment from `app/.env` and `app/.env.local` (not committed).
-- Configure database and other services via `docker-compose.yml` and env variables in `.env` files.
-- For local overrides, create `app/.env.local`.
+- `app/.env`: template with placeholders (commited to repo) 
+- `app/.env.local`: developer-specific (ignored by git) 
+- `shared/.env.local`: server-specific (written automatically from GitHub Secrets in deploy)
+- `.env.local.php`: compiled env file for production (`composer dump-env prod`)
+
+---
+
+## CI/CD Workflow
+
+### The project uses **GitHub Actions** for:
+
+- Code Quality: PHPStan & PHP_CodeSniffer
+- Deployment: rsync over SSH to web hosting
+
+### Deployment process
+
+1. Push your changes to **main** branch:
+   
+    ```bash
+   git add .
+   git commit -m "my feature"
+   git push -u origin main
+   ```
+
+2. GitHub Action runs:
+    
+   - rsync code to `${REMOTE_PATH}/release/`
+   - write `shared/.env.local` from GitHub Secrets
+   - symlink into `release/.env.local`
+   - create empty `.env` (needed for dump-env)
+   - run `composer dump-env prod`
+   - install prod dependencies (`--no-dev`)
+   - warmup symfony cache
+3. Subdomain points to `${REMOTE_PATH}/release/public`
+
+👉 Just open https://your-subdomain.example.com in your browser
+
+### Required GitHub Secrets
+
+- `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `SSH_KEY`
+- `REMOTE_PATH`, `PHP_BIN`, `COMPOSER_BIN`
+- `APP_SECRET`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`
 
 ---
 
