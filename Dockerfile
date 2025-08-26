@@ -27,6 +27,9 @@ FROM node:20-alpine AS assets-build
 WORKDIR /app
 ARG APP_DIR=app
 
+# Tools for native module
+RUN apk add --no-cache python3 make g++
+
 # Copy complete app directory
 COPY ${APP_DIR}/ ./
 
