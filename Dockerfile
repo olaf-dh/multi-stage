@@ -34,21 +34,27 @@ RUN apk add --no-cache python3 make g++
 COPY ${APP_DIR}/ ./
 
 # Only install/build, when frontend exist
-RUN if [ -f yarn.lock ]; then \
-      corepack enable && yarn install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then \
-      npm ci; \
-    elif [ -f package.json ]; then \
-      npm install; \
+RUN set -eux; \
+  echo "PWD=$(pwd)"; ls -la; \
+  if [ -f package.json ]; then \
+    if [ -f package-lock.json ]; then \
+      echo "Installing with npm ci"; \
+      npm ci || npm ci --legacy-peer-deps || npm ci --omit=optional; \
     else \
-      echo "No package.json found – skipping JS deps"; \
-    fi \
- && if [ -f webpack.config.js ]; then \
-      CI=1 npm run build || npx --yes @symfony/webpack-encore production; \
-    else \
-      echo "No webpack.config.js – skipping asset build"; \
-    fi \
- && mkdir -p /app/public/build
+      echo "Installing with npm install"; \
+      npm install || npm install --legacy-peer-deps; \
+    fi; \
+  else \
+    echo "No package.json found – skipping JS deps"; \
+  fi; \
+  if [ -f webpack.config.js ]; then \
+    echo "Building assets"; \
+    CI=1 npm run build || npx --yes @symfony/webpack-encore production; \
+  else \
+    echo "No webpack.config.js – skipping asset build"; \
+  fi; \
+  mkdir -p /app/public/build
+
 
 # ---------- 3) Runtime ----------
 FROM php:8.3-fpm-alpine AS runtime
