@@ -4,7 +4,7 @@ IMAGE   ?= $(PROJECT):prod
 APP_DIR ?= app
 CMD ?=
 
-.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project install-twig init-demo health
+.PHONY: help setup build up down logs sh init-frontend up-prod composer node-build node-watch first-init install-doctrine wait-db db-create migrate console ensure-env-local phpstan phpcs start-project install-twig init-demo health k8s-apply k8s-clean k8s-status
 
 help:
 	@echo "Targets:"
@@ -31,6 +31,9 @@ help:
 	@echo "  install-twig       - use this command to install Twig-Templating"
 	@echo "  init-demo          - install a first controller and a twig-template"
 	@echo "  health             - check status for services nginx, php and db"
+	@echo "  k8s-apply          - apply all kubernetes resources"
+	@echo "  k8s-clean          - clean up"
+	@echo "  k8s-status         - check status for pods, svc"
 
 # This is only necessary when app-directory not exists
 first-init: setup build up wait-db ensure-env-local install-doctrine db-create migrate install-twig init-demo init-frontend node-build
@@ -131,3 +134,12 @@ health:
 	@echo "nginx:" && docker compose exec -T nginx sh -lc 'wget -q --spider http://127.0.0.1/health && echo "  OK" || (echo "  DOWN"; exit 1)'
 	@echo "php-fpm:" && docker compose exec -T php sh -lc 'php -r '\''exit(@fsockopen("127.0.0.1",9000) ? 0 : 1);'\'' && echo "  OK" || (echo "  DOWN"; exit 1)'
 	@echo "db:" && docker compose exec -T db sh -lc 'mysqladmin ping -h localhost -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent && echo "  OK" || (echo "  DOWN"; exit 1)'
+
+k8s-apply:
+	kubectl apply -f k8s/
+
+k8s-clean:
+	kubectl delete -f k8s/ --ignore-not-found=true
+
+k8s-status:
+	kubectl -n symfony get pods,svc
