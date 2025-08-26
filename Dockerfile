@@ -33,16 +33,24 @@ RUN apk add --no-cache python3 make g++
 # Copy complete app directory
 COPY ${APP_DIR}/ ./
 
+# Ensure clean npm config for public registry
+RUN rm -f .npmrc /root/.npmrc \
+ && npm config set registry https://registry.npmjs.org/ \
+ && npm config set always-auth false \
+ && npm config delete //registry.npmjs.org/:_authToken || true \
+ && npm config set fetch-retries 5 \
+ && npm config set fetch-retry-factor 2 \
+ && npm config set fetch-retry-mintimeout 10000
+
 # Only install/build, when frontend exist
 RUN set -eux; \
     echo "PWD=$(pwd)"; ls -la; \
-    npm config set registry https://registry.npmjs.org/; \
-    if [ -f package.json ]; then \
-        if [ -f package-lock.json ]; then \
-            npm ci --verbose || npm ci --legacy-peer-deps --verbose || npm ci --omit=optional --verbose; \
-        else \
-            npm install --verbose || npm install --legacy-peer-deps --verbose; \
-        fi; \
+    if [ -f package-lock.json ]; then \
+        echo "Installing with npm ci"; \
+        npm ci --verbose || npm ci --legacy-peer-deps --verbose || npm ci --omit=optional --verbose; \
+    elif [ -f package.json ]; then \
+        echo "Installing with npm install"; \
+        npm install --verbose || npm install --legacy-peer-deps --verbose; \
     else \
         echo "No package.json found – skipping JS deps"; \
     fi; \
@@ -54,7 +62,6 @@ RUN set -eux; \
     fi; \
     mkdir -p /app/public/build
 
-
 # ---------- 3) Runtime ----------
 FROM php:8.3-fpm-alpine AS runtime
 
@@ -63,7 +70,7 @@ RUN apk add --no-cache bash icu-libs libzip
 
 # Build-deps temporary for PHP extensions
 RUN apk add --no-cache --virtual .build-deps \
-      $PHPIZE_DEPS icu-dev libzip-dev postgresql-dev \
+    $PHPIZE_DEPS icu-dev libzip-dev postgresql-dev \
  && docker-php-ext-install -j"$(nproc)" opcache pdo pdo_mysql intl \
  && apk del .build-deps
 
