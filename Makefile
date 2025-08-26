@@ -46,16 +46,16 @@ install-doctrine:
 	@$(MAKE) composer CMD='require --no-interaction --dev symfony/maker-bundle doctrine/doctrine-migrations-bundle'
 
 ensure-env-local:
-	@test -f app/.env.local || echo 'DATABASE_URL="postgresql://app:app@db:5432/app?serverVersion=16&charset=utf8"' > app/.env.local
-	@echo "✅ app/.env.local set (DATABASE_URL → db:5432)"
+	@test -f app/.env.local || echo 'DATABASE_URL="mysql://app:app@db:3306/app?serverVersion=mariadb-10.6&charset=utf8"' > app/.env.local
+	@echo "✅ app/.env.local set (DATABASE_URL → db:3306)"
 
 # wait, until Postgres is ready
 wait-db:
-	@echo "⏳ Wait for PostgreSQL…"
-	@until docker compose exec -T db pg_isready -U app -d app -h 127.0.0.1 -p 5432 >/dev/null 2>&1; do \
+	@echo "⏳ Wait for MariaDB…"
+	@until docker compose exec -T db mysqladmin ping -h 127.0.0.1 -uapp -papp --silent; do \
 		sleep 1; \
 	done
-	@echo "✅ PostgreSQL is ready."
+	@echo "✅ MariaDB is ready."
 
 # create DB (idempotent)
 db-create:

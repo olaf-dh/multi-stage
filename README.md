@@ -1,4 +1,18 @@
-# Symfony Docker Setup (Makefile + Docker Compose)
+# Symfony Docker Project (Makefile + Docker Compose)
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start-fresh-clone)
+- [Make targets](#make-targets-cheat-sheet)
+- [Service overview](#service-overview)
+- [Developer workflow](#typical-developer-workflow)
+- [Project structure](#project-structure-excerpt)
+- [CI/CD Workflow](#cicd-workflow)
+- [Troubleshooting](#troubleshooting)
+- [Symfony in K8s](#symfony-in-k8s)
+- [FAQ](#faq)
+
 
 This repository contains a Symfony application located in `app/`, plus a Docker‑based development setup driven by a `Makefile`. PHP and Node/Encore tooling run in containers — nothing to install locally except Docker.
 
@@ -17,6 +31,7 @@ Docker Compose automatically merges both when you run `docker compose …`.
 
 - **Docker** and **Docker Compose v2**
 - **GNU Make** and Bash
+- **Kubernetes**
 
 > The containers assume the Symfony project root is mounted at `/app` (composer/node) and `/var/www/html` (php/nginx), mapped to `./app` on your host.
 
@@ -49,33 +64,32 @@ make assets-build
 
 ## Make targets (cheat sheet)
 
-- `make start` — Build, up, composer install, npm ci, and one-off asset build (all-in-one). After that, the dev watcher from the override keeps running.
+- `make first-init` — **One-time bootstrap** to scaffold `app/` if it is missing.
+- `make setup` — Create symfony skeleton in `app/` (just once).
 - `make build` — Build images defined in `docker-compose.yml`.
 - `make up` — Start containers in the background (merges override automatically).
 - `make down` — Stop and remove containers.
 - `make logs` — Tail logs of all services.
 - `make sh` — Shell into the PHP container (named `php`).
-- `make install` — Composer install + npm ci + asset build.
-- `make composer-install` — Only Composer install.
-- `make composer-update` — Only Composer update.
-- `make assets-install` — `npm ci` inside a short‑lived Node container.
-- `make assets-build` — `npm run build` once inside a short‑lived Node container.
-- `make assets-dev` — `npm run dev` once inside a short‑lived Node container (the long‑running watcher already comes from the override).
-- `make init-encore` — Optional one-time Encore init script.
+- `make composer` — Execute composer in container (like `make composer CMD="require foo/bar"`).
+- `make start-project` — Use this command to start the project after clone from repository. 
 - `make up-prod` — Bring up services **without** local overrides (uses only `docker-compose.yml`).
-- `make first-init` — **One-time bootstrap** to scaffold `app/` if it is missing.
+- `make health` — Check status for services nginx, php and db.
+- `make console` — Execute bin/console commands in container (like: `make console CMD="make:controller HomeController"`)
+- `make phpstan` — Starts static analysis PHPStan of defined directories in `app/phpstan.neon.dist`.
+- `male phpcs` — Run PHP_CodeSniffer according to `app/phpcs.dist.xml`.
 
 > Note: Running `make up` by default uses both compose files. Use `make up-prod` to simulate a minimal/CI run without the override.
 
 ## Service overview
 
-| Service  | Defined in      | Role                        | Image / Build                                                              | Ports (host→container) | Volumes (host → container)                                                                        | Env / Command                                                   | Depends on |
-| -------- |-----------------|-----------------------------|----------------------------------------------------------------------------| ---------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- |
-| php      | base + override | PHP-FPM runtime for Symfony | Build: `Dockerfile` → `my-symfony-app:prod`                                | –                      | `./app` → `/var/www/html:delegated` (override)                                                    | `APP_ENV=dev`, `APP_DEBUG=1`                                    | db         |
-| nginx    | base + override | HTTP server & static files  | Build: `docker/nginx/Dockerfile` (arg `RUNTIME_IMAGE=my-symfony-app:prod`) | `8080` → `80`          | `./app` → `/var/www/html:ro`, `./docker/nginx/default.conf` → `/etc/nginx/conf.d/default.conf:ro` | –                                                               | php        |
-| db       | base + override | MariaDB 10.6                | Image: `mariadb:10.6.21`                                                   | – (internal only)      | `dbdata` (named volume) → `/var/lib/postgresql/data`                                              | `POSTGRES_DB=app`, `POSTGRES_USER=app`, `POSTGRES_PASSWORD=app` | –          |
-| composer | override        | Composer CLI (ephemeral)    | Build: `docker/composer/Dockerfile`                                        | –                      | `./app` → `/app`, `${HOME}/.cache/composer` → `/tmp/composer/cache`                               | `COMPOSER_HOME=/tmp/composer`, entrypoint `composer`            | –          |
-| node     | override        | Assets build + dev watcher  | Image: `node:20-alpine`                                                    | –                      | `./app` → `/app`                                                                                  | `command: npm install && npm run dev -- --watch`                | –          |
+| Service  | Defined in      | Role                        | Image / Build                                                              | Ports (host→container) | Volumes (host → container)                                                                        | Env / Command                                                      | Depends on |
+| -------- |-----------------|-----------------------------|----------------------------------------------------------------------------| ---------------------- |---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------| ---------- |
+| php      | base + override | PHP-FPM runtime for Symfony | Build: `Dockerfile` → `my-symfony-app:prod`                                | –                      | `./app` → `/var/www/html:delegated` (override)                                                    | `APP_ENV=dev`, `APP_DEBUG=1`                                       | db         |
+| nginx    | base + override | HTTP server & static files  | Build: `docker/nginx/Dockerfile` (arg `RUNTIME_IMAGE=my-symfony-app:prod`) | `8080` → `80`          | `./app` → `/var/www/html:ro`, `./docker/nginx/default.conf` → `/etc/nginx/conf.d/default.conf:ro` | –                                                                  | php        |
+| db       | base + override | MariaDB 10.6                | Image: `mariadb:10.6.21`                                                   | – (internal only)      | `dbdata` (named volume) → `/var/lib/mysql`                                                        | `MARIADB_DATABASE=app`, `MARIADB_USER=app`, `MARIADB_PASSWORD=app` | –          |
+| composer | override        | Composer CLI (ephemeral)    | Build: `docker/composer/Dockerfile`                                        | –                      | `./app` → `/app`, `${HOME}/.cache/composer` → `/tmp/composer/cache`                               | `COMPOSER_HOME=/tmp/composer`, entrypoint `composer`               | –          |
+| node     | override        | Assets build + dev watcher  | Image: `node:20-alpine`                                                    | –                      | `./app` → `/app`                                                                                  | `command: npm install && npm run dev -- --watch`                   | –          |
 
 **Notes**
 
@@ -127,6 +141,9 @@ make assets-build
 ├── Makefile
 ├── docker-compose.yml
 ├── docker-compose.override.yml
+├── github/
+│   ├── workflows/
+│   │   └── deploy.yml            # CI/CD piplines            
 ├── docker/
 │   ├── composer/
 │   │   └── Dockerfile            # Composer image with CA certificates baked in
@@ -187,7 +204,7 @@ make assets-build
    - install prod dependencies (`--no-dev`)
    - warmup symfony cache
 3. Subdomain points to `${REMOTE_PATH}/release/public`
-4. **Important:** When the webhoster uses Apache, it requires the Symfony `.htaccess` file in `public/` to rewrite requests to `index.php`.
+4. **Important:** When the webhost uses Apache, it requires the Symfony `.htaccess` file in `public/` to rewrite requests to `index.php`.
 
 👉 Just open https://your-subdomain.example.com in your browser
 
@@ -212,13 +229,13 @@ Without it, Symfony routes will return 404.
 
 This project ships a **custom Composer image** defined at `docker/composer/Dockerfile` which installs CA certificates (works on Alpine/Debian bases). If you still encounter `curl error 60`:
 
-1. Rebuild the Composer image:
+Rebuild the Composer image:
 
 ```bash
 docker compose build composer
 ```
 
-2. Re-run your Composer command:
+Re-run your Composer command:
 
 ```bash
 make composer-install
@@ -253,6 +270,53 @@ So during development, assets are rebuilt automatically. Use `make assets-build`
 - Use `make up-prod` for a run without local overrides.
 - Install prod PHP deps: `make composer CMD='install --no-dev --classmap-authoritative'`.
 - Build prod assets: `docker compose run --rm node sh -lc 'cd /app && npm run build'`.
+
+---
+
+## Symfony in K8s
+
+This project also provides an example setup to run the Symfony application in **Kubernetes** with a **MariaDB** database.  
+All manifests are located in the `k8s/` directory and include:
+
+- **Namespace** `symfony`
+- **Secret** for database credentials
+- **ConfigMap** for application environment variables (`APP_ENV`, `APP_SECRET`, `DATABASE_URL`)
+- **MariaDB Deployment + PVC + Service** (ClusterIP)
+- **Symfony App Deployment + Service** (NodePort for local access with Minikube)
+
+### Prerequisites
+- Docker image of the Symfony app (e.g. `my-symfony-app:prod`)
+- A Kubernetes cluster (tested with **Minikube**)
+- `minikube` (Install local - on Mac with `brew install minikube`)
+- `kubectl` CLI
+
+### Deployment
+```bash
+# Start Minikube
+minikube start
+
+# Load the Symfony app image into Minikube
+minikube image load my-symfony-app:prod
+
+# Apply all Kubernetes resources
+kubectl apply -f k8s/
+
+# Check status
+kubectl -n symfony get pods,svc
+
+# Open the app in the browser
+minikube service symfony-app -n symfony --url
+```
+
+### Notes
+
+- Database connection is configured via `ConfigMap`:
+```bash
+DATABASE_URL=mysql://app:app@db:3306/app?serverVersion=mariadb-10.6&charset=utf8mb4
+```
+- Readiness and liveness probes expect a health route (/health) in the Symfony app.
+- The application service is exposed as a NodePort (30080 by default) for easy local testing with Minikube.
+- Future improvements: add Ingress + TLS, horizontal scaling, and Redis for cache/session handling.
 
 ---
 
