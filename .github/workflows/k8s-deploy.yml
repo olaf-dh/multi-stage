@@ -4,10 +4,8 @@ on:
   push:
     branches: [ feature/k8s-symfony ]
     paths:
-      - "app/**"
-      - "docker/**"
-      - "k8s/**"
-      - ".github/workflows/k8s-deploy.yml"
+      - "**"
+
 
 permissions:
   contents: read
