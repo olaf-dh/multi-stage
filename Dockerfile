@@ -3,7 +3,7 @@ FROM php:8.3-fpm-bullseye AS composer-build
 
 RUN apt-get update && apt-get install -y \
     git unzip libicu-dev libzip-dev libpq-dev \
- && docker-php-ext-install intl zip opcache pdo pdo_mysql pdo_pgsql
+ && docker-php-ext-install intl zip opcache pdo pdo_mysql
 
 # Composer from official image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -35,37 +35,36 @@ COPY ${APP_DIR}/ ./
 
 # Only install/build, when frontend exist
 RUN set -eux; \
-  echo "PWD=$(pwd)"; ls -la; \
-  if [ -f package.json ]; then \
-    if [ -f package-lock.json ]; then \
-      echo "Installing with npm ci"; \
-      npm ci || npm ci --legacy-peer-deps || npm ci --omit=optional; \
+    echo "PWD=$(pwd)"; ls -la; \
+    npm config set registry https://registry.npmjs.org/; \
+    if [ -f package.json ]; then \
+        if [ -f package-lock.json ]; then \
+            npm ci --verbose || npm ci --legacy-peer-deps --verbose || npm ci --omit=optional --verbose; \
+        else \
+            npm install --verbose || npm install --legacy-peer-deps --verbose; \
+        fi; \
     else \
-      echo "Installing with npm install"; \
-      npm install || npm install --legacy-peer-deps; \
+        echo "No package.json found – skipping JS deps"; \
     fi; \
-  else \
-    echo "No package.json found – skipping JS deps"; \
-  fi; \
-  if [ -f webpack.config.js ]; then \
-    echo "Building assets"; \
-    CI=1 npm run build || npx --yes @symfony/webpack-encore production; \
-  else \
-    echo "No webpack.config.js – skipping asset build"; \
-  fi; \
-  mkdir -p /app/public/build
+    if [ -f webpack.config.js ]; then \
+        echo "Building assets"; \
+        CI=1 npm run build || npx --yes @symfony/webpack-encore production; \
+    else \
+        echo "No webpack.config.js – skipping asset build"; \
+    fi; \
+    mkdir -p /app/public/build
 
 
 # ---------- 3) Runtime ----------
 FROM php:8.3-fpm-alpine AS runtime
 
 # Runtime-Libs
-RUN apk add --no-cache bash icu-libs libzip postgresql-libs
+RUN apk add --no-cache bash icu-libs libzip
 
 # Build-deps temporary for PHP extensions
 RUN apk add --no-cache --virtual .build-deps \
       $PHPIZE_DEPS icu-dev libzip-dev postgresql-dev \
- && docker-php-ext-install -j"$(nproc)" opcache pdo pdo_mysql pdo_pgsql intl \
+ && docker-php-ext-install -j"$(nproc)" opcache pdo pdo_mysql intl \
  && apk del .build-deps
 
 ENV APP_ENV=prod APP_DEBUG=0
